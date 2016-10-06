@@ -1,17 +1,16 @@
 # nodejs-socket-redis
 Use nodejs+socket.io+redis to implement a realtime Chat server
 
-文章目录
-- 1. 主要思路
-- 2. 推送服务器
-- 3. 客户端Lib库
-- 4. Server端全部代码
+文章目录  
+- 1. 主要思路  
+- 2. 推送服务器  
+- 3. 客户端Lib库  
+- 4. Server端全部代码  
 
-两年前在项目中使用nodejs+socket.io+redis实现的聊天和推送服务器,
-基本上几百行代码就实现了整个功能，在项目中单服务器单进程可以跑到支持
+2014年在项目中使用nodejs+socket.io+redis实现的聊天和推送服务器, 基本上几百行代码就实现了整个功能，在项目中单服务器单进程可以跑到支持
 5000人左右同时在线。
 
-主要思路
+## 主要思路
 
 - 用户上线后，根据用户的userid和socket，保存到一个全局的map中
 - 发送消息时，根据对方的userid找到对应的socket，通过socket.emit发送消息给对方
@@ -19,72 +18,83 @@ Use nodejs+socket.io+redis to implement a realtime Chat server
 - 用户下线后，从全局的map中删除对应的用户socket
 - 由于需要保持长连接，客户端需要定时发心跳给服务端，所以定义了一个心跳消息，可以5分钟发一次
 
-- 用户上线
+### 用户上线
+
+```javascript
+
 io.sockets.on('connection', function (socket) {
 
--     var address = socket.handshake.address;
--     console.log(Date() + " New connection from " + address.address + ":" + address.port);
--     socket.on('login', function (userinfo) {
--         userid = userinfo.myAuraId
+    var address = socket.handshake.address;
+    console.log(Date() + " New connection from " + address.address + ":" + address.port);
+    socket.on('login', function (userinfo) {
+        userid = userinfo.myAuraId
         var address = socket.handshake.address;
--         var deviceid = userinfo.deviceId
--         console.log(Date() + " Login from " + address.address + ":" + address.port + " " + userid + " " + deviceid);
--         old_socket = sockets[userid]
+        var deviceid = userinfo.deviceId
+        console.log(Date() + " Login from " + address.address + ":" + address.port + " " + userid + " " + deviceid);
+        old_socket = sockets[userid]
         if (old_socket && old_socket.deviceid && deviceid && old_socket.deviceid != deviceid) {
--             old_socket.relogin = 1
--             old_socket.emit('logout')
--             console.log("logout " + old_socket.userid + " " + old_socket.deviceid)
--         }
+            old_socket.relogin = 1
+            old_socket.emit('logout')
+            console.log("logout " + old_socket.userid + " " + old_socket.deviceid)
+        }
         if (old_socket && old_socket != socket) {
 
--             old_socket.disconnect()
+            old_socket.disconnect()
         }
         socket.relogin = 0
 
--         socket.userid = userid
+        socket.userid = userid
         socket.deviceid = deviceid
   //发送离线消息
--         send_store_msg(socket, userid)
+        send_store_msg(socket, userid)
         sockets[userid] = socket
 
 
         //通知业务服务器，用户已登录
 
--         pub.publish("login_message_channel", JSON.stringify(userinfo))
+        pub.publish("login_message_channel", JSON.stringify(userinfo))
 
--     })
+    })
+```
+### 发送消息
 
-- 发送消息
+```javascript
 socket.on('chat', function (msg, ack) {
 
--     //process_msg(msg)
--     pub.publish("chat_filter_channel", JSON.stringify(msg))
--     socket.userid = msg.from
+    //process_msg(msg)
+    pub.publish("chat_filter_channel", JSON.stringify(msg))
+    socket.userid = msg.from
     sockets[socket.userid] = socket
     if (ack) {
--         ack(1)
--     }
+        ack(1)
+    }
 })
+```
+### 接收和回应心跳
 
-- 接收和回应心跳
+```javascript
 socket.on('hb', function (msg, ack) {
 
--     if (ack) {
--         ack(1)
--     }
+    if (ack) {
+         ack(1)
+     }
 })
+```
 
-- 用户下线，删除对应的socket
+### 用户下线，删除对应的socket
+
+```javascript
 socket.on("disconnect", function () {
 
--     var address = socket.handshake.address;
--     console.log(Date() + " Disconnect from " + address.address + ":" + address.port);
--     if (!socket.relogin) {
--         delete sockets[socket.userid]
--     }
+    var address = socket.handshake.address;
+    console.log(Date() + " Disconnect from " + address.address + ":" + address.port);
+    if (!socket.relogin) {
+        delete sockets[socket.userid]
+    }
 })
+```
 
-推送服务器
+## 推送服务器
 
 实现了聊天服务器后，对推送来说就很简单了
 
@@ -92,6 +102,7 @@ socket.on("disconnect", function () {
 - nodejs subscribe这个channel监听数据，找到对应用户发送消息即可。
 - 用户不在线，可能也需要对这个离线推送消息做保留，具体看业务定义
 
+```javascript
 var notification = redis.createClient()
 notification.subscribe("notification")
 
@@ -132,8 +143,9 @@ function send_notification(socket, notif) {
         store.hdel("nodejs_notification", socket.userid)
     })
 }
+```
 
-客户端Lib库
+## 客户端Lib库
 
 服务端是使用socket.io实现，基本上socket.io的Lib都能兼容
 
@@ -144,7 +156,9 @@ function send_notification(socket, notif) {
 
 其他语言版本，可以在github搜索socket.io,找到对应的Lib库
 
-Server端全部代码
+## Server端全部代码
+
+```javascript
 
 //var io = require('socket.io').listen(80)
 var app = require('http').createServer(handler)
@@ -440,5 +454,7 @@ io.sockets.on('connection', function (socket) {
     })
 
 })
+```
 
-参考地址：http://www.aswifter.com/2015/06/13/nodejs-chat-server/
+### 参考
+1. [使用Nodejs实现聊天服务器]( http://www.aswifter.com/2015/06/13/nodejs-chat-server/)
