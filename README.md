@@ -458,3 +458,4 @@ io.sockets.on('connection', function (socket) {
 
 ### 参考
 1. [使用Nodejs实现聊天服务器]( http://www.aswifter.com/2015/06/13/nodejs-chat-server/)
+2. [GoEasy在线demo地址]（https://goeasy.io/www/examples.jsp）
